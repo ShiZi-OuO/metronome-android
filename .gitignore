@@ -1,0 +1,30 @@
+# Gradle / Android build outputs
+.gradle/
+.kotlin/
+build/
+**/build/
+
+# Local machine config
+local.properties
+
+# IDE files
+.idea/
+*.iml
+
+# Android Studio captures
+captures/
+
+# Generated packages
+*.apk
+*.aab
+*.ap_
+
+# JVM / OS noise
+*.class
+*.log
+.DS_Store
+Thumbs.db
+
+# Local verification artifacts in the repository root
+/*.png
+/window.xml
