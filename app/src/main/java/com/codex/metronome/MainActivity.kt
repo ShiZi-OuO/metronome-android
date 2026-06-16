@@ -1,6 +1,7 @@
 package com.codex.metronome
 
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -21,8 +22,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -55,12 +58,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -79,11 +84,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             val state by viewModel.state.collectAsStateWithLifecycle()
             MetronomeTheme(darkMode = state.darkMode) {
-                FullscreenEffect(enabled = state.fullscreen)
+                SystemBarsEffect(darkMode = state.darkMode)
                 MetronomeScreen(state = state, viewModel = viewModel)
             }
         }
@@ -152,9 +157,17 @@ private fun MetronomeTheme(darkMode: Boolean, content: @Composable () -> Unit) {
     val view = LocalView.current
     SideEffect {
         val window = (view.context as ComponentActivity).window
-        window.statusBarColor = colors.page.toArgb()
-        window.navigationBarColor = colors.page.toArgb()
-        WindowInsetsControllerCompat(window, view).isAppearanceLightStatusBars = !darkMode
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.Transparent.toArgb()
+        window.navigationBarColor = Color.Transparent.toArgb()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
+        WindowInsetsControllerCompat(window, view).apply {
+            isAppearanceLightStatusBars = !darkMode
+            isAppearanceLightNavigationBars = !darkMode
+        }
     }
     val scheme = if (darkMode) {
         darkColorScheme(
@@ -181,21 +194,17 @@ private fun MetronomeTheme(darkMode: Boolean, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun FullscreenEffect(enabled: Boolean) {
+private fun SystemBarsEffect(darkMode: Boolean) {
     val view = LocalView.current
     val window = (view.context as ComponentActivity).window
-    DisposableEffect(enabled) {
+    DisposableEffect(darkMode) {
         val controller = WindowInsetsControllerCompat(window, view)
-        WindowCompat.setDecorFitsSystemWindows(window, !enabled)
-        if (enabled) {
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-            controller.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        } else {
-            controller.show(WindowInsetsCompat.Type.systemBars())
-        }
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        controller.show(WindowInsetsCompat.Type.systemBars())
+        controller.isAppearanceLightStatusBars = !darkMode
+        controller.isAppearanceLightNavigationBars = !darkMode
         onDispose {
-            WindowCompat.setDecorFitsSystemWindows(window, true)
+            WindowCompat.setDecorFitsSystemWindows(window, false)
             controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }
@@ -204,6 +213,9 @@ private fun FullscreenEffect(enabled: Boolean) {
 @Composable
 private fun MetronomeScreen(state: MetronomeUiState, viewModel: MetronomeViewModel) {
     val colors = palette(state.darkMode)
+    val density = LocalDensity.current
+    val statusBarPadding = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
+    val navigationBarPadding = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Color.Transparent,
@@ -241,16 +253,25 @@ private fun MetronomeScreen(state: MetronomeUiState, viewModel: MetronomeViewMod
                         ),
                     ),
             )
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .clipToBounds(),
             ) {
-                MetronomeCard(state = state, viewModel = viewModel, colors = colors)
-                Spacer(Modifier.height(18.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp)
+                        .padding(
+                            top = statusBarPadding + 10.dp,
+                            bottom = navigationBarPadding + 14.dp,
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    MetronomeCard(state = state, viewModel = viewModel, colors = colors)
+                    Spacer(Modifier.height(18.dp))
+                }
             }
         }
     }
