@@ -93,6 +93,16 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.resumeFromBackground()
+    }
+
+    override fun onPause() {
+        viewModel.pauseForBackground()
+        super.onPause()
+    }
 }
 
 private val Accent = Color(0xFFEB825A)

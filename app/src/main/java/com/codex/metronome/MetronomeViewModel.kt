@@ -22,6 +22,7 @@ class MetronomeViewModel(application: Application) : AndroidViewModel(applicatio
     private var metronomeJob: Job? = null
     private var timerJob: Job? = null
     private var previousTapMillis: Long? = null
+    private var resumeAfterBackground = false
 
     fun changeBpm(delta: Int) {
         setBpm(_state.value.bpm + delta)
@@ -116,6 +117,7 @@ class MetronomeViewModel(application: Application) : AndroidViewModel(applicatio
         timerJob?.cancel()
         metronomeJob = null
         timerJob = null
+        resumeAfterBackground = false
         _state.update {
             it.copy(
                 isRunning = false,
@@ -123,6 +125,31 @@ class MetronomeViewModel(application: Application) : AndroidViewModel(applicatio
                 remainingTimerSeconds = it.timerDurationSeconds,
             )
         }
+    }
+
+    fun pauseForBackground() {
+        if (!_state.value.isRunning) {
+            resumeAfterBackground = false
+            return
+        }
+        resumeAfterBackground = true
+        metronomeJob?.cancel()
+        timerJob?.cancel()
+        metronomeJob = null
+        timerJob = null
+        _state.update { it.copy(isRunning = false) }
+    }
+
+    fun resumeFromBackground() {
+        if (!resumeAfterBackground || _state.value.isRunning) return
+        if (_state.value.timerEnabled && _state.value.remainingTimerSeconds <= 0) {
+            stop()
+            return
+        }
+        resumeAfterBackground = false
+        _state.update { it.copy(isRunning = true) }
+        startTimerIfNeeded()
+        startMetronomeLoop()
     }
 
     override fun onCleared() {
